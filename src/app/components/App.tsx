@@ -230,7 +230,7 @@ const App = ({}) => {
     };
   }, []);
 
-  let body;
+  //let body;
 
   return (
     <div className="container">

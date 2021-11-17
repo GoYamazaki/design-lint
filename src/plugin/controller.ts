@@ -3,8 +3,7 @@ import {
   checkEffects,
   checkFills,
   checkStrokes,
-  checkType,
-  customCheckTextFills
+  checkType
   // customCheckTextFills,
 } from "./lintingFunctions";
 
