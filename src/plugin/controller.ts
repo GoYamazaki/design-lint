@@ -3,9 +3,12 @@ import {
   checkEffects,
   checkFills,
   checkStrokes,
-  checkType
+  checkType,
+  createErrorObject
   // customCheckTextFills,
 } from "./lintingFunctions";
+
+import _ from "lodash";
 
 figma.showUI(__html__, { width: 360, height: 580 });
 
@@ -167,57 +170,30 @@ figma.ui.onmessage = msg => {
     return serializedNodes;
   }
 
-  function lint(nodes, lockedParentNode?) {
-    let errorArray = [];
-    let childArray = [];
+  function lint(nodes) {
+    let component_nodes = [];
+    let errors = {};
 
-    nodes.forEach(node => {
-      let isLayerLocked;
-
-      // Create a new object.
-      let newObject = {};
-
-      // Give it the existing node id.
-      newObject["id"] = node.id;
-
-      // Don't lint locked layers or the children/grandchildren of locked layers.
-      if (lockedParentNode === undefined && node.locked === true) {
-        isLayerLocked = true;
-      } else if (lockedParentNode === undefined && node.locked === false) {
-        isLayerLocked = false;
-      } else if (lockedParentNode === false && node.locked === true) {
-        isLayerLocked = true;
-      } else {
-        isLayerLocked = lockedParentNode;
+    nodes.forEach(element => {
+      if (element.type === "COMPONENT_SET") {
+        errors = { ...lintComponentSet(element) };
+        component_nodes.push(
+          ...element.findChildren(e => {
+            return e.type === "COMPONENT";
+          })
+        );
+      } else if (element.type === "COMPONENT") {
+        component_nodes.push(element);
       }
-
-      if (isLayerLocked === true) {
-        newObject["errors"] = [];
-      } else {
-        newObject["errors"] = determineType(node);
-      }
-
-      // Recursively run this function to flatten out children and grandchildren nodes
-      if (node["children"]) {
-        node["children"].forEach(childNode => {
-          childArray.push(childNode.id);
-        });
-
-        newObject["children"] = childArray;
-
-        // If the layer is locked, pass the optional parameter to the recursive Lint
-        // function to indicate this layer is locked.
-        if (isLayerLocked === true) {
-          errorArray.push(...lint(node["children"], true));
-        } else {
-          errorArray.push(...lint(node["children"], false));
-        }
-      }
-
-      errorArray.push(newObject);
     });
 
-    return errorArray;
+    errors = traverse2(component_nodes, errors);
+
+    let errors_list = [];
+    for (let k in errors) {
+      errors_list.push(errors[k]);
+    }
+    return errors_list;
   }
 
   // Initialize the app
@@ -263,6 +239,67 @@ figma.ui.onmessage = msg => {
     }
   }
 
+  function error_map(node) {
+    var err_map = {};
+    err_map[node.id] = { id: node.id, errors: [] };
+    if (node.children) {
+      err_map[node.id].children = [...node.children.map(x => x.id)];
+    } else {
+      err_map[node.id].children = [];
+    }
+
+    return err_map;
+  }
+
+  function traverse2(nodes, err_map) {
+    if (nodes.length == 0) {
+      return err_map;
+    }
+
+    for (let i = 0; i < nodes.length; i++) {
+      err_map = { ...err_map, ...error_map(nodes[i]) };
+      err_map[nodes[i].id].errors = determineType(nodes[i]);
+    }
+
+    // let first = nodes[0];
+    let new_nodes = [];
+
+    //Lint Check
+    for (let i = 0; i < nodes.length; i++) {
+      // if (first.type !== other.type) {
+      //   let err = createErrorObject(
+      //     other,
+      //     "text",
+      //     `${other.name} is not the same type as the ${first.type}`
+      //   );
+      //   err_map[other.id].errors.push(err);
+      // }
+
+      // if (first.type != "COMPONENT" && first.name != other.name) {
+      //   let err = createErrorObject(
+      //     other,
+      //     "text",
+      //     `${other.name} is not the same name as the ${first.name}`
+      //   );
+      //   err_map[other.id].errors.push(err);
+      // }
+
+      if (nodes[i].children) {
+        new_nodes.push(...nodes[i].children);
+      }
+    }
+
+    return traverse2(new_nodes, err_map);
+
+    // for (let i = 0; i < err_map[first.id].children.length; i++) {
+    //   let childrenInSamePosition = [];
+    //   nodes.forEach(element => {
+    //     childrenInSamePosition.push(element.children?.get(i));
+    //   });
+    //   traverse2(childrenInSamePosition, err_map);
+    // }
+  }
+
   function determineType(node) {
     switch (node.type) {
       case "SLICE":
@@ -290,13 +327,6 @@ figma.ui.onmessage = msg => {
       case "COMPONENT": {
         return lintComponentRules(node);
       }
-      case "COMPONENT_SET": {
-        // Component Set is the frame that wraps a set of variants
-        // the variants within the set are still linted as components (lintComponentRules)
-        // this type is generally only present where the variant is defined so it
-        // doesn't need as many linting requirements.
-        return lintVariantWrapperRules(node);
-      }
       case "TEXT": {
         return lintTextRules(node);
       }
@@ -319,20 +349,70 @@ figma.ui.onmessage = msg => {
     //   );
     // }
 
-    checkFills(node, errors);
-    checkRadius(node, errors, borderRadiusArray);
-    checkEffects(node, errors);
-    checkStrokes(node, errors);
+    return errors;
+  }
+
+  function cartesian(args) {
+    var r = [],
+      max = args.length - 1;
+    function helper(arr, i) {
+      for (var j = 0, l = args[i].length; j < l; j++) {
+        var a = new Set(arr);
+        a.add(args[i][j]);
+        if (i == max) r.push(a);
+        else helper(a, i + 1);
+      }
+    }
+    helper([], 0);
+    return r;
+  }
+
+  function lintComponentSet(node) {
+    let errors = error_map(node);
+
+    let allVariants = [];
+    Object.keys(node.variantGroupProperties).forEach(k => {
+      allVariants.push(node.variantGroupProperties[k].values);
+    });
+
+    var allVariantCombination = cartesian(allVariants);
+    node.children.forEach(element => {
+      allVariantCombination = completeComponentVariantsMap(
+        element,
+        allVariantCombination
+      );
+    });
+
+    if (allVariantCombination.length !== 0) {
+      let err = createErrorObject(
+        node,
+        "component_set",
+        "The variants combination of the children in this componentset is imcomplete."
+      );
+      errors[node.id].errors.push(err);
+    }
 
     return errors;
   }
 
-  function lintVariantWrapperRules(node) {
-    let errors = [];
+  function eqSet(as, bs) {
+    if (as.size !== bs.size) return false;
+    for (var a of as) if (!bs.has(a)) return false;
+    return true;
+  }
 
-    checkFills(node, errors);
+  function completeComponentVariantsMap(componentNode, allVariantCombination) {
+    if (componentNode.type !== "COMPONENT") {
+      return;
+    }
 
-    return errors;
+    let variants = componentNode.variantProperties;
+    var combination = new Set();
+    Object.keys(variants).forEach(k => {
+      combination.add(variants[k]);
+    });
+
+    return allVariantCombination.filter(e => eqSet(e, combination) === false);
   }
 
   function lintLineRules(node) {
@@ -361,7 +441,7 @@ figma.ui.onmessage = msg => {
     checkType(node, errors);
     checkFills(node, errors);
 
-    // We could also comment out checkFills and use a custom function instead
+    // We could also comment out checkFills and use a custComponentSetom function instead
     // Take a look at line 122 in lintingFunction.ts for an example.
     // customCheckTextFills(node, errors);
     checkEffects(node, errors);
@@ -372,6 +452,7 @@ figma.ui.onmessage = msg => {
 
   function lintRectangleRules(node) {
     let errors = [];
+    err_map;
 
     checkFills(node, errors);
     checkRadius(node, errors, borderRadiusArray);
