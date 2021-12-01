@@ -4,7 +4,7 @@ import {
   checkFills,
   checkStrokes,
   checkType,
-  createErrorObject
+  createErrorObject,
   // customCheckTextFills,
 } from "./lintingFunctions";
 
@@ -16,7 +16,7 @@ let borderRadiusArray = [0, 2, 4, 8, 16, 24, 32];
 let originalNodeTree = [];
 let lintVectors = false;
 
-figma.ui.onmessage = msg => {
+figma.ui.onmessage = (msg) => {
   // Fetch a specific node by ID.
   if (msg.type === "fetch-layer-data") {
     let layer = figma.getNodeById(msg.id);
@@ -41,12 +41,12 @@ figma.ui.onmessage = msg => {
       "paints",
       "fontName",
       "fontSize",
-      "font"
+      "font",
     ]);
 
     figma.ui.postMessage({
       type: "fetched layer",
-      message: layerData
+      message: layerData,
     });
   }
 
@@ -54,7 +54,7 @@ figma.ui.onmessage = msg => {
   if (msg.type === "update-errors") {
     figma.ui.postMessage({
       type: "updated errors",
-      errors: lint(originalNodeTree)
+      errors: lint(originalNodeTree),
     });
   }
 
@@ -73,7 +73,7 @@ figma.ui.onmessage = msg => {
 
     figma.ui.postMessage({
       type: "reset storage",
-      storage: arrayToBeStored
+      storage: arrayToBeStored,
     });
 
     figma.notify("Cleared ignored errors", { timeout: 1000 });
@@ -89,7 +89,7 @@ figma.ui.onmessage = msg => {
     let newString = msg.radiusValues.replace(/\s+/g, "");
     let newRadiusArray = newString.split(",");
     newRadiusArray = newRadiusArray
-      .filter(x => x.trim().length && !isNaN(x))
+      .filter((x) => x.trim().length && !isNaN(x))
       .map(Number);
 
     // Most users won't add 0 to the array of border radius so let's add it in for them.
@@ -106,7 +106,7 @@ figma.ui.onmessage = msg => {
 
     figma.ui.postMessage({
       type: "fetched border radius",
-      storage: JSON.stringify(borderRadiusArray)
+      storage: JSON.stringify(borderRadiusArray),
     });
 
     figma.notify("Saved new border radius values", { timeout: 1000 });
@@ -118,7 +118,7 @@ figma.ui.onmessage = msg => {
 
     figma.ui.postMessage({
       type: "fetched border radius",
-      storage: JSON.stringify(borderRadiusArray)
+      storage: JSON.stringify(borderRadiusArray),
     });
 
     figma.notify("Reset border radius value", { timeout: 1000 });
@@ -128,7 +128,7 @@ figma.ui.onmessage = msg => {
     const layerArray = msg.nodeArray;
     let nodesToBeSelected = [];
 
-    layerArray.forEach(item => {
+    layerArray.forEach((item) => {
       let layer = figma.getNodeById(item);
       // Using selection and viewport requires an array.
       nodesToBeSelected.push(layer);
@@ -164,7 +164,7 @@ figma.ui.onmessage = msg => {
       "name",
       "type",
       "children",
-      "id"
+      "id",
     ]);
 
     return serializedNodes;
@@ -174,11 +174,11 @@ figma.ui.onmessage = msg => {
     let component_nodes = [];
     let errors = {};
 
-    nodes.forEach(element => {
+    nodes.forEach((element) => {
       if (element.type === "COMPONENT_SET") {
         errors = { ...lintComponentSet(element) };
         component_nodes.push(
-          ...element.findChildren(e => {
+          ...element.findChildren((e) => {
             return e.type === "COMPONENT";
           })
         );
@@ -212,27 +212,27 @@ figma.ui.onmessage = msg => {
       figma.ui.postMessage({
         type: "complete",
         message: serializeNodes(nodes),
-        errors: lint(nodes)
+        errors: lint(nodes),
       });
 
       figma.notify(`Design lint is running and will auto refresh for changes`, {
-        timeout: 2000
+        timeout: 2000,
       });
 
-      figma.clientStorage.getAsync("storedErrorsToIgnore").then(result => {
+      figma.clientStorage.getAsync("storedErrorsToIgnore").then((result) => {
         figma.ui.postMessage({
           type: "fetched storage",
-          storage: result
+          storage: result,
         });
       });
 
-      figma.clientStorage.getAsync("storedRadiusValues").then(result => {
+      figma.clientStorage.getAsync("storedRadiusValues").then((result) => {
         if (result.length) {
           borderRadiusArray = JSON.parse(result);
 
           figma.ui.postMessage({
             type: "fetched border radius",
-            storage: result
+            storage: result,
           });
         }
       });
@@ -243,7 +243,7 @@ figma.ui.onmessage = msg => {
     let err_map = {};
     err_map[node.id] = { id: node.id, errors: [] };
     if (node.children) {
-      err_map[node.id].children = [...node.children.map(x => x.id)];
+      err_map[node.id].children = [...node.children.map((x) => x.id)];
     } else {
       err_map[node.id].children = [];
     }
@@ -267,7 +267,7 @@ figma.ui.onmessage = msg => {
     }
 
     let children_in_group = [];
-    group.forEach(v => {
+    group.forEach((v) => {
       children_in_group.push(v);
     });
     return children_in_group;
@@ -280,8 +280,12 @@ figma.ui.onmessage = msg => {
 
     for (let i = 0; i < nodes.length; i++) {
       err_map = { ...err_map, ...error_map(nodes[i]) };
-      err_map[nodes[i].id].errors = determineType(nodes[i]);
     }
+
+    let collected_error = determineType(nodes);
+    collected_error.forEach((v, k) => {
+      err_map[k].errors = [v];
+    });
 
     let new_nodes = [];
 
@@ -293,15 +297,17 @@ figma.ui.onmessage = msg => {
     }
 
     let groups = grouping(new_nodes);
-    groups.forEach(g => {
+    groups.forEach((g) => {
       err_map = { ...err_map, ...traverse2(g, err_map) };
     });
 
     return err_map;
   }
 
-  function determineType(node) {
-    switch (node.type) {
+  function determineType(nodes) {
+    const pivot = nodes[0];
+    // All of the node's type in the `nodes` array must be same.
+    switch (pivot.type) {
       case "SLICE":
       case "GROUP": {
         // Groups styles apply to their children so we can skip this node type.
@@ -310,28 +316,28 @@ figma.ui.onmessage = msg => {
       }
       case "BOOLEAN_OPERATION":
       case "VECTOR": {
-        return lintVectorRules(node);
+        return lintVectorRules(nodes);
       }
       case "POLYGON":
       case "STAR":
       case "ELLIPSE": {
-        return lintShapeRules(node);
+        return lintShapeRules(nodes);
       }
       case "FRAME": {
-        return lintFrameRules(node);
+        return lintFrameRules(nodes);
       }
       case "INSTANCE":
       case "RECTANGLE": {
-        return lintRectangleRules(node);
+        return lintRectangleRules(nodes);
       }
       case "COMPONENT": {
-        return lintComponentRules(node);
+        return lintComponentRules(nodes);
       }
       case "TEXT": {
-        return lintTextRules(node);
+        return lintTextRules(nodes);
       }
       case "LINE": {
-        return lintLineRules(node);
+        return lintLineRules(nodes);
       }
       default: {
         // Do nothing
@@ -340,7 +346,7 @@ figma.ui.onmessage = msg => {
   }
 
   function lintComponentRules(node) {
-    let errors = [];
+    let errors = new Map();
 
     // Example of how we can make a custom rule specifically for components
     // if (node.remote === false) {
@@ -350,9 +356,9 @@ figma.ui.onmessage = msg => {
     // }
 
     checkFills(node, errors);
-    checkRadius(node, errors, borderRadiusArray);
-    checkEffects(node, errors);
-    checkStrokes(node, errors);
+    // checkRadius(node, errors, borderRadiusArray);
+    // checkEffects(node, errors);
+    // checkStrokes(node, errors);
     return errors;
   }
 
@@ -375,12 +381,12 @@ figma.ui.onmessage = msg => {
     let errors = error_map(node);
 
     let allVariants = [];
-    Object.keys(node.variantGroupProperties).forEach(k => {
+    Object.keys(node.variantGroupProperties).forEach((k) => {
       allVariants.push(node.variantGroupProperties[k].values);
     });
 
     var allVariantCombination = cartesianProduct(allVariants);
-    node.children.forEach(element => {
+    node.children.forEach((element) => {
       allVariantCombination = completeComponentVariantsMap(
         element,
         allVariantCombination
@@ -412,78 +418,78 @@ figma.ui.onmessage = msg => {
 
     let variants = componentNode.variantProperties;
     var combination = new Set();
-    Object.keys(variants).forEach(k => {
+    Object.keys(variants).forEach((k) => {
       combination.add(variants[k]);
     });
 
-    return allVariantCombination.filter(e => eqSet(e, combination) === false);
+    return allVariantCombination.filter((e) => eqSet(e, combination) === false);
   }
 
-  function lintLineRules(node) {
+  function lintLineRules(nodes) {
     let errors = [];
 
-    checkStrokes(node, errors);
-    checkEffects(node, errors);
+    // checkStrokes(nodes, errors);
+    // checkEffects(nodes, errors);
 
     return errors;
   }
 
-  function lintFrameRules(node) {
-    let errors = [];
+  function lintFrameRules(nodes) {
+    let errors = new Map();
 
-    checkFills(node, errors);
-    checkStrokes(node, errors);
-    checkRadius(node, errors, borderRadiusArray);
-    checkEffects(node, errors);
+    checkFills(nodes, errors);
+    // checkStrokes(nodes, errors);
+    // checkRadius(nodes, errors, borderRadiusArray);
+    // checkEffects(nodes, errors);
 
     return errors;
   }
 
   function lintTextRules(node) {
-    let errors = [];
+    let errors = new Map();
 
-    checkType(node, errors);
+    // checkType(node, errors);
     checkFills(node, errors);
 
     // We could also comment out checkFills and use a custComponentSetom function instead
     // Take a look at line 122 in lintingFunction.ts for an example.
     // customCheckTextFills(node, errors);
-    checkEffects(node, errors);
-    checkStrokes(node, errors);
+    // checkEffects(node, errors);
+    // checkStrokes(node, errors);
 
     return errors;
   }
 
   function lintRectangleRules(node) {
-    let errors = [];
+    let errors = new Map();
 
     checkFills(node, errors);
-    checkRadius(node, errors, borderRadiusArray);
-    checkStrokes(node, errors);
-    checkEffects(node, errors);
+    // checkRadius(node, errors, borderRadiusArray);
+    // checkStrokes(node, errors);
+    // checkEffects(node, errors);
 
     return errors;
   }
 
   function lintVectorRules(node) {
-    let errors = [];
+    let errors = new Map();
 
     // This can be enabled by the user in settings.
     if (lintVectors === true) {
       checkFills(node, errors);
-      checkStrokes(node, errors);
-      checkEffects(node, errors);
+      // checkStrokes(node, errors);
+      // checkEffects(node, errors);
     }
 
     return errors;
   }
 
   function lintShapeRules(node) {
-    let errors = [];
+    let errors = new Map();
 
     checkFills(node, errors);
-    checkStrokes(node, errors);
-    checkEffects(node, errors);
+    // checkStrokes(node, errors);
+    // checkEffects(node, errors);
 
     return errors;
   }

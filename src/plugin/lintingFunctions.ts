@@ -6,7 +6,7 @@ export function createErrorObject(node, type, message, value?) {
     message: "",
     type: "",
     node: "",
-    value: ""
+    value: "",
   };
 
   error.message = message;
@@ -24,7 +24,7 @@ export function createErrorObject(node, type, message, value?) {
 export function determineFill(fills) {
   let fillValues = [];
 
-  fills.forEach(fill => {
+  fills.forEach((fill) => {
     if (fill.type === "SOLID") {
       let rgbObj = convertColor(fill.color);
       fillValues.push(RGBToHex(rgbObj["r"], rgbObj["g"], rgbObj["b"]));
@@ -32,7 +32,7 @@ export function determineFill(fills) {
       fillValues.push("Image - " + fill.imageHash);
     } else {
       const gradientValues = [];
-      fill.gradientStops.forEach(gradientStops => {
+      fill.gradientStops.forEach((gradientStops) => {
         let gradientColorObject = convertColor(gradientStops.color);
         gradientValues.push(
           RGBToHex(
@@ -117,71 +117,20 @@ export function checkRadius(node, errors, radiusValues) {
   }
 }
 
-// Custom Lint rule that isn't being used yet!
-// that ensures our text fills aren't using styles (design tokens) meant for backgrounds.
-export function customCheckTextFills(node, errors) {
-  // Here we create an array of style keys (https://www.figma.com/plugin-docs/api/PaintStyle/#key)
-  // that we want to make sure our text layers aren't using.
-  const fillsToCheck = [
-    "4b93d40f61be15e255e87948a715521c3ae957e6"
-    // To collect style keys, use a plugin like Inspector, or use console commands like figma.getLocalPaintStyles();
-    // in your design system file.
-  ];
-
-  let nodeFillStyle = node.fillStyleId;
-
-  // If there are multiple text styles on a single text layer, we can't lint it
-  // we can return an error instead.
-  if (typeof nodeFillStyle === "symbol") {
-    return errors.push(
-      createErrorObject(
-        node, // Node object we use to reference the error (id, layer name, etc)
-        "fill", // Type of error (fill, text, effect, etc)
-        "Mixing two styles together", // Message we show to the user
-        "Multiple Styles" // Normally we return a hex value here
-      )
-    );
-  }
-
-  // We strip the additional style key characters so we can check
-  // to see if the fill is being used incorrectly.
-  nodeFillStyle = nodeFillStyle.replace("S:", "");
-  nodeFillStyle = nodeFillStyle.split(",")[0];
-
-  // If the node (layer) has a fill style, then check to see if there's an error.
-  if (nodeFillStyle !== "") {
-    // If we find the layer has a fillStyle that matches in the array create an error.
-    if (fillsToCheck.includes(nodeFillStyle)) {
-      return errors.push(
-        createErrorObject(
-          node, // Node object we use to reference the error (id, layer name, etc)
-          "fill", // Type of error (fill, text, effect, etc)
-          "Incorrect text color use", // Message we show to the user
-          "Using a background color on a text layer" // Determines the fill, so we can show a hex value.
-        )
-      );
-    }
-    // If there is no fillStyle on this layer,
-    // check to see why with our default linting function for fills.
-  } else {
-    checkFills(node, errors);
-  }
-}
-
 // Check for effects like shadows, blurs etc.
 export function checkEffects(node, errors) {
   if (node.effects.length) {
     if (node.effectStyleId === "") {
       const effectsArray = [];
 
-      node.effects.forEach(effect => {
+      node.effects.forEach((effect) => {
         let effectsObject = {
           type: "",
           radius: "",
           offsetX: "",
           offsetY: "",
           fill: "",
-          value: ""
+          value: "",
         };
 
         // All effects have a radius.
@@ -230,26 +179,24 @@ export function checkEffects(node, errors) {
   }
 }
 
-export function checkFills(node, errors) {
-  if (node.fills.length && node.visible === true) {
-    if (
-      node.fillStyleId === "" &&
-      node.fills[0].type !== "IMAGE" &&
-      node.fills[0].visible === true
-    ) {
-      // We may need an array to loop through fill types.
-      return errors.push(
-        createErrorObject(
-          node,
-          "fill",
-          "Missing fill style",
-          determineFill(node.fills)
-        )
-      );
-    } else {
-      return;
-    }
+export function checkFills(nodes, errors) {
+  if (nodes.length === 0) {
+    return;
   }
+
+  nodes.forEach((n) => {
+    if (n.fills.length && n.visible === true) {
+      const fillId = n.fillStyleId;
+      const fillStyle = figma.getStyleById(fillId);
+      const fillStyleName = fillStyle?.name ?? "";
+      if (fillStyleName.startsWith("Toyota/Day") === false) {
+        const err = createErrorObject(n, "fill", "Use Toyota/Day Style");
+        errors.set(n.id, err);
+      }
+    }
+  });
+
+  return errors;
 }
 
 export function checkStrokes(node, errors) {
@@ -258,7 +205,7 @@ export function checkStrokes(node, errors) {
       let strokeObject = {
         strokeWeight: "",
         strokeAlign: "",
-        strokeFills: []
+        strokeFills: [],
       };
 
       strokeObject.strokeWeight = node.strokeWeight;
@@ -282,7 +229,7 @@ export function checkType(node, errors) {
       font: "",
       fontStyle: "",
       fontSize: "",
-      lineHeight: {}
+      lineHeight: {},
     };
 
     textObject.font = node.fontName.family;
@@ -307,11 +254,11 @@ export function checkType(node, errors) {
 }
 
 // Utility functions for color conversion.
-const convertColor = color => {
+const convertColor = (color) => {
   const colorObj = color;
   const figmaColor = {};
 
-  Object.entries(colorObj).forEach(cf => {
+  Object.entries(colorObj).forEach((cf) => {
     const [key, value] = cf;
 
     if (["r", "g", "b"].includes(key)) {
