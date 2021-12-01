@@ -3,7 +3,7 @@ import {
   checkEffects,
   checkFills,
   checkStrokes,
-  checkType,
+  checkTextType,
   createErrorObject,
   // customCheckTextFills,
 } from "./lintingFunctions";
@@ -448,12 +448,8 @@ figma.ui.onmessage = (msg) => {
   function lintTextRules(node) {
     let errors = new Map();
 
-    // checkType(node, errors);
+    checkTextType(node, errors);
     checkFills(node, errors);
-
-    // We could also comment out checkFills and use a custComponentSetom function instead
-    // Take a look at line 122 in lintingFunction.ts for an example.
-    // customCheckTextFills(node, errors);
     // checkEffects(node, errors);
     // checkStrokes(node, errors);
 

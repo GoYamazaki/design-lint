@@ -223,34 +223,24 @@ export function checkStrokes(node, errors) {
   }
 }
 
-export function checkType(node, errors) {
-  if (node.textStyleId === "" && node.visible === true) {
-    let textObject = {
-      font: "",
-      fontStyle: "",
-      fontSize: "",
-      lineHeight: {},
-    };
-
-    textObject.font = node.fontName.family;
-    textObject.fontStyle = node.fontName.style;
-    textObject.fontSize = node.fontSize;
-
-    // Line height can be "auto" or a pixel value
-    if (node.lineHeight.value !== undefined) {
-      textObject.lineHeight = node.lineHeight.value;
-    } else {
-      textObject.lineHeight = "Auto";
-    }
-
-    let currentStyle = `${textObject.font} ${textObject.fontStyle} / ${textObject.fontSize} (${textObject.lineHeight} line-height)`;
-
-    return errors.push(
-      createErrorObject(node, "text", "Missing text style", currentStyle)
-    );
-  } else {
+export function checkTextType(nodes, errors) {
+  if (nodes.length === 0) {
     return;
   }
+
+  nodes.forEach((n) => {
+    const textStyleId = n.textStyleId;
+    const textStyle = figma.getStyleById(textStyleId);
+    const textStyleName = textStyle?.name ?? "";
+
+    const textFontRegex = /Toyota\/.+\/10\.5\/.+/g;
+    if (!textStyleName.match(textFontRegex)) {
+      const err = createErrorObject(n, "text", "Use Toyota/10.5 Style");
+      errors.set(n.id, err);
+    }
+  });
+
+  return errors;
 }
 
 // Utility functions for color conversion.
