@@ -240,7 +240,7 @@ figma.ui.onmessage = msg => {
   }
 
   function error_map(node) {
-    var err_map = {};
+    let err_map = {};
     err_map[node.id] = { id: node.id, errors: [] };
     if (node.children) {
       err_map[node.id].children = [...node.children.map(x => x.id)];
@@ -249,6 +249,28 @@ figma.ui.onmessage = msg => {
     }
 
     return err_map;
+  }
+
+  function grouping(children) {
+    let group = new Map();
+    //Create keys in dumb way
+    const groupTypeFormat = "NODETYPE:NODENAME";
+    for (let child of children) {
+      const groupType = groupTypeFormat
+        .replace("NODETYPE", child.type)
+        .replace("NODENAME", child.name);
+      if (group.has(groupType)) {
+        group.set(groupType, [...group.get(groupType), child]);
+      } else {
+        group.set(groupType, [child]);
+      }
+    }
+
+    let children_in_group = [];
+    group.forEach(v => {
+      children_in_group.push(v);
+    });
+    return children_in_group;
   }
 
   function traverse2(nodes, err_map) {
@@ -261,43 +283,21 @@ figma.ui.onmessage = msg => {
       err_map[nodes[i].id].errors = determineType(nodes[i]);
     }
 
-    // let first = nodes[0];
     let new_nodes = [];
 
     //Lint Check
     for (let i = 0; i < nodes.length; i++) {
-      // if (first.type !== other.type) {
-      //   let err = createErrorObject(
-      //     other,
-      //     "text",
-      //     `${other.name} is not the same type as the ${first.type}`
-      //   );
-      //   err_map[other.id].errors.push(err);
-      // }
-
-      // if (first.type != "COMPONENT" && first.name != other.name) {
-      //   let err = createErrorObject(
-      //     other,
-      //     "text",
-      //     `${other.name} is not the same name as the ${first.name}`
-      //   );
-      //   err_map[other.id].errors.push(err);
-      // }
-
       if (nodes[i].children) {
         new_nodes.push(...nodes[i].children);
       }
     }
 
-    return traverse2(new_nodes, err_map);
+    let groups = grouping(new_nodes);
+    groups.forEach(g => {
+      err_map = { ...err_map, ...traverse2(g, err_map) };
+    });
 
-    // for (let i = 0; i < err_map[first.id].children.length; i++) {
-    //   let childrenInSamePosition = [];
-    //   nodes.forEach(element => {
-    //     childrenInSamePosition.push(element.children?.get(i));
-    //   });
-    //   traverse2(childrenInSamePosition, err_map);
-    // }
+    return err_map;
   }
 
   function determineType(node) {
@@ -349,11 +349,15 @@ figma.ui.onmessage = msg => {
     //   );
     // }
 
+    checkFills(node, errors);
+    checkRadius(node, errors, borderRadiusArray);
+    checkEffects(node, errors);
+    checkStrokes(node, errors);
     return errors;
   }
 
-  function cartesian(args) {
-    var r = [],
+  function cartesianProduct(args) {
+    let r = [],
       max = args.length - 1;
     function helper(arr, i) {
       for (var j = 0, l = args[i].length; j < l; j++) {
@@ -375,7 +379,7 @@ figma.ui.onmessage = msg => {
       allVariants.push(node.variantGroupProperties[k].values);
     });
 
-    var allVariantCombination = cartesian(allVariants);
+    var allVariantCombination = cartesianProduct(allVariants);
     node.children.forEach(element => {
       allVariantCombination = completeComponentVariantsMap(
         element,
@@ -452,7 +456,6 @@ figma.ui.onmessage = msg => {
 
   function lintRectangleRules(node) {
     let errors = [];
-    err_map;
 
     checkFills(node, errors);
     checkRadius(node, errors, borderRadiusArray);
