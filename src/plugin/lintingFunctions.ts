@@ -20,164 +20,9 @@ export function createErrorObject(node, type, message, value?) {
   return error;
 }
 
-// Determine a nodes fills
-export function determineFill(fills) {
-  let fillValues = [];
-
-  fills.forEach((fill) => {
-    if (fill.type === "SOLID") {
-      let rgbObj = convertColor(fill.color);
-      fillValues.push(RGBToHex(rgbObj["r"], rgbObj["g"], rgbObj["b"]));
-    } else if (fill.type === "IMAGE") {
-      fillValues.push("Image - " + fill.imageHash);
-    } else {
-      const gradientValues = [];
-      fill.gradientStops.forEach((gradientStops) => {
-        let gradientColorObject = convertColor(gradientStops.color);
-        gradientValues.push(
-          RGBToHex(
-            gradientColorObject["r"],
-            gradientColorObject["g"],
-            gradientColorObject["b"]
-          )
-        );
-      });
-      let gradientValueString = gradientValues.toString();
-      fillValues.push(`${fill.type} ${gradientValueString}`);
-    }
-  });
-
-  return fillValues[0];
-}
-
-// Lint border radius
-export function checkRadius(node, errors, radiusValues) {
-  let cornerType = node.cornerRadius;
-
-  if (typeof cornerType !== "symbol") {
-    if (cornerType === 0) {
-      return;
-    }
-  }
-
-  // If the radius isn't even on all sides, check each corner.
-  if (typeof cornerType === "symbol") {
-    if (radiusValues.indexOf(node.topLeftRadius) === -1) {
-      return errors.push(
-        createErrorObject(
-          node,
-          "radius",
-          "Incorrect Top Left Radius",
-          node.topRightRadius
-        )
-      );
-    } else if (radiusValues.indexOf(node.topRightRadius) === -1) {
-      return errors.push(
-        createErrorObject(
-          node,
-          "radius",
-          "Incorrect top right radius",
-          node.topRightRadius
-        )
-      );
-    } else if (radiusValues.indexOf(node.bottomLeftRadius) === -1) {
-      return errors.push(
-        createErrorObject(
-          node,
-          "radius",
-          "Incorrect bottom left radius",
-          node.bottomLeftRadius
-        )
-      );
-    } else if (radiusValues.indexOf(node.bottomRightRadius) === -1) {
-      return errors.push(
-        createErrorObject(
-          node,
-          "radius",
-          "Incorrect bottom right radius",
-          node.bottomRightRadius
-        )
-      );
-    } else {
-      return;
-    }
-  } else {
-    if (radiusValues.indexOf(node.cornerRadius) === -1) {
-      return errors.push(
-        createErrorObject(
-          node,
-          "radius",
-          "Incorrect border radius",
-          node.cornerRadius
-        )
-      );
-    } else {
-      return;
-    }
-  }
-}
-
-// Check for effects like shadows, blurs etc.
-export function checkEffects(node, errors) {
-  if (node.effects.length) {
-    if (node.effectStyleId === "") {
-      const effectsArray = [];
-
-      node.effects.forEach((effect) => {
-        let effectsObject = {
-          type: "",
-          radius: "",
-          offsetX: "",
-          offsetY: "",
-          fill: "",
-          value: "",
-        };
-
-        // All effects have a radius.
-        effectsObject.radius = effect.radius;
-
-        if (effect.type === "DROP_SHADOW") {
-          effectsObject.type = "Drop Shadow";
-        } else if (effect.type === "INNER_SHADOW") {
-          effectsObject.type = "Inner Shadow";
-        } else if (effect.type === "LAYER_BLUR") {
-          effectsObject.type = "Layer Blur";
-        } else {
-          effectsObject.type = "Background Blur";
-        }
-
-        if (effect.color) {
-          let effectsFill = convertColor(effect.color);
-          effectsObject.fill = RGBToHex(
-            effectsFill["r"],
-            effectsFill["g"],
-            effectsFill["b"]
-          );
-          effectsObject.offsetX = effect.offset.x;
-          effectsObject.offsetY = effect.offset.y;
-          effectsObject.value = `${effectsObject.type} ${effectsObject.fill} ${effectsObject.radius}px X: ${effectsObject.offsetX}, Y: ${effectsObject.offsetY}`;
-        } else {
-          effectsObject.value = `${effectsObject.type} ${effectsObject.radius}px`;
-        }
-
-        effectsArray.unshift(effectsObject);
-      });
-
-      let currentStyle = effectsArray[0].value;
-
-      return errors.push(
-        createErrorObject(
-          node,
-          "effects",
-          "Missing effects style",
-          currentStyle
-        )
-      );
-    } else {
-      return;
-    }
-  }
-}
+////////////////////////////
+// Check Nodes Use Toyota Style
+////////////////////////////
 
 export function checkFills(nodes, errors) {
   if (nodes.length === 0) {
@@ -190,37 +35,13 @@ export function checkFills(nodes, errors) {
       const fillStyle = figma.getStyleById(fillId);
       const fillStyleName = fillStyle?.name ?? "";
       if (fillStyleName.startsWith("Toyota/Day") === false) {
-        const err = createErrorObject(n, "fill", "Use Toyota/Day Style");
+        const err = createErrorObject(n, "fill", "Use Toyota/Day Fill Style");
         errors.set(n.id, err);
       }
     }
   });
 
   return errors;
-}
-
-export function checkStrokes(node, errors) {
-  if (node.strokes.length) {
-    if (node.strokeStyleId === "" && node.visible === true) {
-      let strokeObject = {
-        strokeWeight: "",
-        strokeAlign: "",
-        strokeFills: [],
-      };
-
-      strokeObject.strokeWeight = node.strokeWeight;
-      strokeObject.strokeAlign = node.strokeAlign;
-      strokeObject.strokeFills = determineFill(node.strokes);
-
-      let currentStyle = `${strokeObject.strokeFills} / ${strokeObject.strokeWeight} / ${strokeObject.strokeAlign}`;
-
-      return errors.push(
-        createErrorObject(node, "stroke", "Missing stroke style", currentStyle)
-      );
-    } else {
-      return;
-    }
-  }
 }
 
 export function checkTextType(nodes, errors) {
@@ -235,7 +56,7 @@ export function checkTextType(nodes, errors) {
 
     const textFontRegex = /Toyota\/.+\/10\.5\/.+/g;
     if (!textStyleName.match(textFontRegex)) {
-      const err = createErrorObject(n, "text", "Use Toyota/10.5 Style");
+      const err = createErrorObject(n, "text", "Use Toyota/10.5 Text Style");
       errors.set(n.id, err);
     }
   });
@@ -243,32 +64,158 @@ export function checkTextType(nodes, errors) {
   return errors;
 }
 
-// Utility functions for color conversion.
-const convertColor = (color) => {
-  const colorObj = color;
-  const figmaColor = {};
+function checkStrokeStyle(node, errors) {
+  if (node.strokes.length === 0) {
+    return;
+  }
 
-  Object.entries(colorObj).forEach((cf) => {
-    const [key, value] = cf;
+  const strokeStyleId = node.strokeStyleId;
+  const strokeStyle = figma.getStyleById(strokeStyleId);
+  const strokeStyleName = strokeStyle?.name ?? "";
+  if (strokeStyleName.startsWith("Toyota/Day") === false) {
+    const err = createErrorObject(
+      node,
+      "stroke",
+      "Use Toyota/Day Stroke Style"
+    );
+    errors.set(node.id, err);
+  }
+}
 
-    if (["r", "g", "b"].includes(key)) {
-      figmaColor[key] = (255 * (value as number)).toFixed(0);
-    }
-    if (key === "a") {
-      figmaColor[key] = value;
+export function checkEffects(nodes, errors) {
+  if (nodes.length === 0) {
+    return;
+  }
+
+  nodes.forEach((n) => {
+    if (n.effects.length && n.visible === true) {
+      const effectId = n.effectStyleId;
+      const effectStyle = figma.getStyleById(effectId);
+      const effectStyleName = effectStyle?.name ?? "";
+      if (effectStyleName.startsWith("Toyota/") === false) {
+        const err = createErrorObject(n, "effects", "Use Toyota Effect Style");
+        errors.set(n.id, err);
+      }
     }
   });
-  return figmaColor;
-};
 
-function RGBToHex(r, g, b) {
-  r = Number(r).toString(16);
-  g = Number(g).toString(16);
-  b = Number(b).toString(16);
+  return errors;
+}
 
-  if (r.length == 1) r = "0" + r;
-  if (g.length == 1) g = "0" + g;
-  if (b.length == 1) b = "0" + b;
+////////////////////////////
+// Check Node Property Consistency
+////////////////////////////
 
-  return "#" + r + g + b;
+export function checkAllSizeIsEqual(nodes, errors) {
+  if (nodes.length === 0) {
+    return;
+  }
+  const pivot = nodes[0].absoluteRenderBounds;
+
+  let round = (x) => Math.round(x * 1000);
+
+  nodes.forEach((n) => {
+    const bound = n.absoluteRenderBounds;
+    if (
+      round(bound.height) !== round(pivot.height) ||
+      round(bound.width) !== round(pivot.width)
+    ) {
+      const err = createErrorObject(
+        n,
+        "rectangle",
+        "Boundary size of this node is not same as the pivot.",
+        `pivot = (name: ${nodes[0].name}, w : ${
+          round(pivot.width) / 1000
+        }, h : ${round(pivot.height) / 1000})`
+      );
+      errors.set(n.id, err);
+    }
+  });
+  return errors;
+}
+
+export function checkAllRadiusIsEqual(nodes, errors) {
+  if (nodes.length === 0) {
+    return;
+  }
+  const pivot = nodes[0];
+
+  nodes.forEach((n) => {
+    if (n.cornerRadius !== figma.mixed) {
+      if (pivot.cornerRadius !== n.cornerRadius) {
+        const err = createErrorObject(
+          n,
+          "radius",
+          "Radius of this node is not same as the pivot.",
+          `pivot = (name: ${nodes[0].name}, r : ${pivot.cornerRadius}`
+        );
+        errors.set(n.id, err);
+      }
+    } else {
+      if (
+        pivot.topLeftRadius !== n.topLeftRadius ||
+        pivot.topRightRadius !== n.topRightRadius ||
+        pivot.bottomLeftRadius !== n.bottomLeftRadius ||
+        pivot.bottomRightRadius !== n.bottomRightRadius
+      ) {
+        const err = createErrorObject(
+          n,
+          "radius",
+          "Radius of this node is not same as the pivot.",
+          `pivot = (name: ${nodes[0].name}, top-left : ${pivot.topLeftRadius}, top-right : ${pivot.topRightRadius}, botttom-left : ${pivot.bottomLeftRadius}, bottom-right : ${pivot.bottomRightRadius},`
+        );
+        errors.set(n.id, err);
+      }
+    }
+  });
+
+  return errors;
+}
+
+export function checkAllStrokeIsEqual(nodes, errors) {
+  if (nodes.length === 0) {
+    return;
+  }
+  const pivot = nodes[0];
+
+  nodes.forEach((n) => {
+    checkStrokeStyle(n, errors);
+
+    if (pivot.strokes.length !== n.strokes.length) {
+      const err = createErrorObject(
+        n,
+        "stroke",
+        "Strokes length of this node is not same as the pivot",
+        `pivot = (name: ${nodes[0].name}, stroke length : ${pivot.strokes.length}`
+      );
+      errors.set(n.id, err);
+      return;
+    }
+
+    if (pivot.strokes.length === 0) {
+      return;
+    }
+
+    //Weight, Align
+    if (n.strokeWeight !== pivot.strokeWeight) {
+      const err = createErrorObject(
+        n,
+        "stroke",
+        "Strokes Weight of this node is not same as the pivot",
+        `pivot = (name: ${nodes[0].name}, weight : ${pivot.strokeWeight}`
+      );
+      errors.set(n.id, err);
+    }
+
+    if (n.strokeAlign !== pivot.strokeAlign) {
+      const err = createErrorObject(
+        n,
+        "stroke",
+        "Strokes Align of this node is not same as the pivot",
+        `pivot = (name: ${nodes[0].name}, align : ${pivot.strokeAlign}`
+      );
+      errors.set(n.id, err);
+    }
+  });
+  return errors;
 }

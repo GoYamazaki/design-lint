@@ -1,10 +1,11 @@
 import {
-  checkRadius,
   checkEffects,
   checkFills,
-  checkStrokes,
   checkTextType,
   createErrorObject,
+  checkAllSizeIsEqual,
+  checkAllRadiusIsEqual,
+  checkAllStrokeIsEqual,
   // customCheckTextFills,
 } from "./lintingFunctions";
 
@@ -345,26 +346,9 @@ figma.ui.onmessage = (msg) => {
     }
   }
 
-  function lintComponentRules(node) {
-    let errors = new Map();
-
-    // Example of how we can make a custom rule specifically for components
-    // if (node.remote === false) {
-    //   errors.push(
-    //     createErrorObject(node, "component", "Component isn't from library")
-    //   );
-    // }
-
-    checkFills(node, errors);
-    // checkRadius(node, errors, borderRadiusArray);
-    // checkEffects(node, errors);
-    // checkStrokes(node, errors);
-    return errors;
-  }
-
   function cartesianProduct(args) {
-    let r = [],
-      max = args.length - 1;
+    let r = [];
+    let max = args.length - 1;
     function helper(arr, i) {
       for (var j = 0, l = args[i].length; j < l; j++) {
         var a = new Set(arr);
@@ -375,6 +359,26 @@ figma.ui.onmessage = (msg) => {
     }
     helper([], 0);
     return r;
+  }
+
+  function eqSet(as: Set<any>, bs: Set<any>) {
+    if (as.size !== bs.size) return false;
+    for (let a of as) if (!bs.has(a)) return false;
+    return true;
+  }
+
+  function completeComponentVariantsMap(componentNode, allVariantCombination) {
+    if (componentNode.type !== "COMPONENT") {
+      return;
+    }
+
+    let variants = componentNode.variantProperties;
+    var combination = new Set();
+    Object.keys(variants).forEach((k) => {
+      combination.add(variants[k]);
+    });
+
+    return allVariantCombination.filter((e) => eqSet(e, combination) === false);
   }
 
   function lintComponentSet(node) {
@@ -397,7 +401,12 @@ figma.ui.onmessage = (msg) => {
       let err = createErrorObject(
         node,
         "component_set",
-        "The variants combination of the children in this componentset is imcomplete."
+        "The variants combination of the children in this componentset is imcomplete.",
+        `For instance, we could not find (${[...allVariantCombination[0]]
+          .reduce((prev, cur) => {
+            return prev + ", " + cur;
+          }, "")
+          .substring(1)})`
       );
       errors[node.id].errors.push(err);
     }
@@ -405,31 +414,23 @@ figma.ui.onmessage = (msg) => {
     return errors;
   }
 
-  function eqSet(as, bs) {
-    if (as.size !== bs.size) return false;
-    for (var a of as) if (!bs.has(a)) return false;
-    return true;
-  }
+  function lintComponentRules(nodes) {
+    let errors = new Map();
 
-  function completeComponentVariantsMap(componentNode, allVariantCombination) {
-    if (componentNode.type !== "COMPONENT") {
-      return;
-    }
-
-    let variants = componentNode.variantProperties;
-    var combination = new Set();
-    Object.keys(variants).forEach((k) => {
-      combination.add(variants[k]);
-    });
-
-    return allVariantCombination.filter((e) => eqSet(e, combination) === false);
+    checkAllSizeIsEqual(nodes, errors);
+    checkAllRadiusIsEqual(nodes, errors);
+    checkAllStrokeIsEqual(nodes, errors);
+    checkFills(nodes, errors);
+    checkEffects(nodes, errors);
+    return errors;
   }
 
   function lintLineRules(nodes) {
-    let errors = [];
+    let errors = new Map();
 
-    // checkStrokes(nodes, errors);
-    // checkEffects(nodes, errors);
+    checkAllSizeIsEqual(nodes, errors);
+    checkAllStrokeIsEqual(nodes, errors);
+    checkEffects(nodes, errors);
 
     return errors;
   }
@@ -437,55 +438,60 @@ figma.ui.onmessage = (msg) => {
   function lintFrameRules(nodes) {
     let errors = new Map();
 
+    checkAllSizeIsEqual(nodes, errors);
     checkFills(nodes, errors);
-    // checkStrokes(nodes, errors);
-    // checkRadius(nodes, errors, borderRadiusArray);
-    // checkEffects(nodes, errors);
+    checkAllStrokeIsEqual(nodes, errors);
+    checkAllRadiusIsEqual(nodes, errors);
+    checkEffects(nodes, errors);
 
     return errors;
   }
 
-  function lintTextRules(node) {
+  function lintTextRules(nodes) {
     let errors = new Map();
 
-    checkTextType(node, errors);
-    checkFills(node, errors);
-    // checkEffects(node, errors);
-    // checkStrokes(node, errors);
+    checkAllSizeIsEqual(nodes, errors);
+    checkTextType(nodes, errors);
+    checkFills(nodes, errors);
+    checkEffects(nodes, errors);
+    checkAllStrokeIsEqual(nodes, errors);
 
     return errors;
   }
 
-  function lintRectangleRules(node) {
+  function lintRectangleRules(nodes) {
     let errors = new Map();
 
-    checkFills(node, errors);
-    // checkRadius(node, errors, borderRadiusArray);
-    // checkStrokes(node, errors);
-    // checkEffects(node, errors);
+    checkAllSizeIsEqual(nodes, errors);
+    checkFills(nodes, errors);
+    checkAllRadiusIsEqual(nodes, errors);
+    checkAllStrokeIsEqual(nodes, errors);
+    checkEffects(nodes, errors);
 
     return errors;
   }
 
-  function lintVectorRules(node) {
+  function lintVectorRules(nodes) {
     let errors = new Map();
 
     // This can be enabled by the user in settings.
     if (lintVectors === true) {
-      checkFills(node, errors);
-      // checkStrokes(node, errors);
-      // checkEffects(node, errors);
+      checkAllSizeIsEqual(nodes, errors);
+      checkFills(nodes, errors);
+      checkAllStrokeIsEqual(nodes, errors);
+      checkEffects(nodes, errors);
     }
 
     return errors;
   }
 
-  function lintShapeRules(node) {
+  function lintShapeRules(nodes) {
     let errors = new Map();
 
-    checkFills(node, errors);
-    // checkStrokes(node, errors);
-    // checkEffects(node, errors);
+    checkAllSizeIsEqual(nodes, errors);
+    checkFills(nodes, errors);
+    checkAllStrokeIsEqual(nodes, errors);
+    checkEffects(nodes, errors);
 
     return errors;
   }
